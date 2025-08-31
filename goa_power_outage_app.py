@@ -104,7 +104,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 # --- 1. Load the Model and Preprocessor ---
 @st.cache_resource
 def load_resources():
@@ -120,6 +119,13 @@ def load_resources():
 
 model, preprocessor = load_resources()
 
+# --- Load Excel Data for cascading filters ---
+try:
+    df = pd.read_excel("Goa Power Outage Report June 2025.xlsx")
+except FileNotFoundError:
+    st.error("⚠️ Could not load Excel file 'Goa Power Outage Report June 2025.xlsx'. Please place it in the app folder.")
+    st.stop()
+
 # --- 2. Streamlit App Interface ---
 st.set_page_config(page_title="Goa Electricity Department", layout="wide")
 
@@ -128,30 +134,26 @@ st.markdown('<div class="header-text">for Consumers of Goa Electricity Departmen
 st.markdown('<div class="subheader-text">This web app by Shaunak Kunde uses Artificial Intelligence to predict the duration of steady power supply for any region in the state of Goa.<br>Enter the details below to know the results for your locality.</div>', unsafe_allow_html=True)
 
 if model and preprocessor:
-    try:
-        categories = preprocessor.named_transformers_['cat'].categories_
-        towns = ['-select-'] + list(categories[0])
-        substations = ['-select-'] + list(categories[1])
-        feeders = ['-select-'] + list(categories[2])
-        rural_urban = ['-select-'] + list(categories[3])
-    except (AttributeError, IndexError):
-        st.error("Could not load categories from preprocessor. The model might not be correctly trained.")
-        st.stop()
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        town_name = st.selectbox("TOWN NAME", options=towns, index=0)
-    
-    with col2:
-        rural_urban_label = st.selectbox("LOCALITY", options=rural_urban, index=0)
-    
-    col3, col4 = st.columns(2)
-    with col3:
-        substation = st.selectbox("SUBSTATION", options=substations, index=0)
-    
-    with col4:
-        feeder_name = st.selectbox("FEEDER NAME", options=feeders, index=0)
-    
+    # --- Cascading Filters ---
+    towns = ['-select-'] + sorted(df['Town Name'].dropna().unique().tolist())
+    town_name = st.selectbox("TOWN NAME", options=towns, index=0)
+
+    if town_name != '-select-':
+        substations = ['-select-'] + sorted(df[df['Town Name'] == town_name]['Substation'].dropna().unique().tolist())
+    else:
+        substations = ['-select-']
+    substation = st.selectbox("SUBSTATION", options=substations, index=0)
+
+    if substation != '-select-':
+        feeders = ['-select-'] + sorted(df[df['Substation'] == substation]['Feeder Name'].dropna().unique().tolist())
+    else:
+        feeders = ['-select-']
+    feeder_name = st.selectbox("FEEDER NAME", options=feeders, index=0)
+
+    rural_urban = ['-select-'] + sorted(df['Rural/Urban'].dropna().unique().tolist())
+    rural_urban_label = st.selectbox("LOCALITY", options=rural_urban, index=0)
+
+    # --- Predict ---
     if st.button("Show Result"):
         if any(val == '-select-' for val in [town_name, rural_urban_label, substation, feeder_name]):
             st.warning("Please select a value for all fields before predicting.")
@@ -183,7 +185,7 @@ if model and preprocessor:
                 unsafe_allow_html=True
             )
 
-# Add the small comment at the end of the page
+# --- Footer ---
 st.markdown(
     """
     <div class="footer-comment">
