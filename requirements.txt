@@ -1,0 +1,10 @@
+---
+
+### 📦 requirements.txt
+```txt
+pandas
+numpy
+scikit-learn
+joblib
+streamlit
+openpyxl
